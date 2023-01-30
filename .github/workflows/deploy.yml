@@ -1,0 +1,112 @@
+name: Deploy docker
+
+on:
+  push:
+    branches: ['main']
+    tags:
+      - 'v*'
+
+
+env:
+  REGISTRY: ghcr.io
+  API_IMAGE_NAME: dyakovri/redirector-api
+  UI_IMAGE_NAME: dyakovri/redirector-ui
+  API_CONTAITER_NAME: com_profcomff_api_redirect
+  UI_CONTAITER_NAME: com_profcomff_ui_redirect
+
+jobs:
+  deploy-testing:
+    name: Deploy Testing
+    runs-on: [self-hosted, Linux]
+    environment:
+      name: Testing
+      url: https://to.test.profcomff.com/
+    permissions:
+      packages: read
+
+    steps:
+      - name: Pull new API
+        run: docker pull ${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}:master
+
+      - name: Pull new UI
+        run: docker pull ${{ env.REGISTRY }}/${{ env.UI_IMAGE_NAME }}:master
+
+      - name: Migrate DB
+        run: |
+          docker run \
+            --rm \
+            --network=web \
+            --env DB_DSN=${{ secrets.DB_DSN }} \
+            --name ${{ env.API_CONTAITER_NAME }}_migration \
+            ${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}:master \
+            alembic upgrade head
+
+      - name: Run test API
+        run: |
+          docker stop ${{ env.API_CONTAITER_NAME }} || true && docker rm ${{ env.API_CONTAITER_NAME }} || true
+          docker run \
+            --detach \
+            --restart on-failure:3 \
+            --network=web \
+            --env DB_DSN=${{ secrets.DB_DSN }} \
+            --name ${{ env.API_CONTAITER_NAME }}_test \
+            ${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}:master
+
+      - name: Run test UI
+        run: |
+          docker stop ${{ env.UI_IMAGE_NAME }} || true && docker rm ${{ env.UI_IMAGE_NAME }} || true
+          docker run \
+            --detach \
+            --restart on-failure:3 \
+            --network=web \
+            --name ${{ env.UI_CONTAITER_NAME }}_test \
+            ${{ env.REGISTRY }}/${{ env.UI_IMAGE_NAME }}:master
+
+  deploy-production:
+    name: Deploy Production
+    needs: deploy-testing
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: [self-hosted, Linux]
+    environment:
+      name: Production
+      url: https://to.profcomff.com/
+    permissions:
+      packages: read
+
+    steps:
+      - name: Pull new API
+        run: docker pull ${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}:master
+
+      - name: Pull new UI
+        run: docker pull ${{ env.REGISTRY }}/${{ env.UI_IMAGE_NAME }}:master
+
+      - name: Migrate DB
+        run: |
+          docker run \
+            --rm \
+            --network=web \
+            --env DB_DSN=${{ secrets.DB_DSN }} \
+            --name ${{ env.API_CONTAITER_NAME }}_migration \
+            ${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}:master \
+            alembic upgrade head
+
+      - name: Run test API
+        run: |
+          docker stop ${{ env.API_CONTAITER_NAME }} || true && docker rm ${{ env.API_CONTAITER_NAME }} || true
+          docker run \
+            --detach \
+            --restart always \
+            --network=web \
+            --env DB_DSN=${{ secrets.DB_DSN }} \
+            --name ${{ env.API_CONTAITER_NAME }} \
+            ${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}:master
+
+      - name: Run test UI
+        run: |
+          docker stop ${{ env.UI_IMAGE_NAME }} || true && docker rm ${{ env.UI_IMAGE_NAME }} || true
+          docker run \
+            --detach \
+            --restart always \
+            --network=web \
+            --name ${{ env.UI_CONTAITER_NAME }} \
+            ${{ env.REGISTRY }}/${{ env.UI_IMAGE_NAME }}:master
