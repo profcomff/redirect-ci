@@ -43,7 +43,7 @@ jobs:
 
       - name: Run test API
         run: |
-          docker stop ${{ env.API_CONTAITER_NAME }} || true && docker rm ${{ env.API_CONTAITER_NAME }} || true
+          docker stop ${{ env.API_CONTAITER_NAME }}_test || true && docker rm ${{ env.API_CONTAITER_NAME }}_test || true
           docker run \
             --detach \
             --restart on-failure:3 \
@@ -54,7 +54,7 @@ jobs:
 
       - name: Run test UI
         run: |
-          docker stop ${{ env.UI_IMAGE_NAME }} || true && docker rm ${{ env.UI_IMAGE_NAME }} || true
+          docker stop ${{ env.UI_CONTAITER_NAME }}_test || true && docker rm ${{ env.UI_CONTAITER_NAME }}_test || true
           docker run \
             --detach \
             --restart on-failure:3 \
