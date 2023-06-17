@@ -177,7 +177,7 @@ jobs:
 
       - name: Run test UI
         run: |
-          docker stop ${{ env.UI_IMAGE_NAME }} || true && docker rm ${{ env.UI_IMAGE_NAME }} || true
+          docker stop ${{ env.UI_CONTAITER_NAME }} || true && docker rm ${{ env.UI_CONTAITER_NAME }} || true
           docker run \
             --detach \
             --restart always \
