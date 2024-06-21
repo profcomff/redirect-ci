@@ -51,7 +51,7 @@ jobs:
 
   deploy-testing:
     name: Deploy Testing
-    runs-on: [self-hosted, Linux]
+    runs-on: [self-hosted, Linux, testing]
     needs: build-testing
     environment:
       name: Testing
@@ -139,7 +139,7 @@ jobs:
       - build-production
       - deploy-testing
     if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: [self-hosted, Linux]
+    runs-on: [self-hosted, Linux, production]
     environment:
       name: Production
       url: https://to.profcomff.com/
