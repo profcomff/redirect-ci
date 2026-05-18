@@ -25,7 +25,6 @@ jobs:
       DB_DSN: ${{ secrets.DB_DSN }}
       JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
       OIDC_CLIENT_SECRET: ${{ secrets.OIDC_CLIENT_SECRET }}
-      OIDC_TRUSTED_TOKEN: ${{ secrets.OIDC_TRUSTED_TOKEN }}
       BASE_URL: ${{ vars.BASE_URL }}
       OIDC_CONFIGURATION_URI: ${{ vars.OIDC_CONFIGURATION_URI }}
       OIDC_CLIENT_ID: ${{ vars.OIDC_CLIENT_ID }}
@@ -81,7 +80,6 @@ jobs:
       DB_DSN: ${{ secrets.DB_DSN }}
       JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
       OIDC_CLIENT_SECRET: ${{ secrets.OIDC_CLIENT_SECRET }}
-      OIDC_TRUSTED_TOKEN: ${{ secrets.OIDC_TRUSTED_TOKEN }}
       BASE_URL: ${{ vars.BASE_URL }}
       OIDC_CONFIGURATION_URI: ${{ vars.OIDC_CONFIGURATION_URI }}
       OIDC_CLIENT_ID: ${{ vars.OIDC_CLIENT_ID }}
