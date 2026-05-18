@@ -1,143 +1,72 @@
-name: Deploy docker
+name: Deploy redirector
 
 on:
   push:
     branches: ['main']
-    tags:
-      - 'v*'
-
+    tags: ['v*']
 
 env:
-  REGISTRY: ghcr.io
-  API_IMAGE_NAME: dyakovri/redirector-api
-  UI_IMAGE_NAME: dyakovri/redirector-ui
-  API_CONTAITER_NAME: com_profcomff_api_redirect
-  UI_CONTAITER_NAME: com_profcomff_ui_redirect
+  REGISTRY: git.dyakov.space
 
 jobs:
-  build-testing:
-    name: Build testing
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.UI_IMAGE_NAME }}
-      - name: Log in to the Container registry
-        uses: docker/login-action@v2
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: ${{ env.REGISTRY }}/profcomff/redirect-ui
-          tags: |
-            type=raw,value=test,enable=true
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            API_ROOT=https://to.test.profcomff.com
-
   deploy-testing:
     name: Deploy Testing
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: [self-hosted, Linux, testing]
-    needs: build-testing
     environment:
       name: Testing
       url: https://to.test.profcomff.com/
     permissions:
       packages: read
-
-    steps:
-      - name: Pull new API
-        run: docker pull ${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}:master
-
-      - name: Pull new UI
-        run: docker pull ${{ env.REGISTRY }}/profcomff/redirect-ui:test
-
-      - name: Migrate DB
-        run: |
-          docker run \
-            --rm \
-            --network=web \
-            --env DB_DSN=${{ secrets.DB_DSN }} \
-            --name ${{ env.API_CONTAITER_NAME }}_migration \
-            ${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}:master \
-            alembic upgrade head
-
-      - name: Run test API
-        run: |
-          docker stop ${{ env.API_CONTAITER_NAME }}_test || true && docker rm ${{ env.API_CONTAITER_NAME }}_test || true
-          docker run \
-            --detach \
-            --restart on-failure:3 \
-            --network=web \
-            --env DB_DSN=${{ secrets.DB_DSN }} \
-            --name ${{ env.API_CONTAITER_NAME }}_test \
-            ${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}:master
-
-      - name: Run test UI
-        run: |
-          docker stop ${{ env.UI_CONTAITER_NAME }}_test || true && docker rm ${{ env.UI_CONTAITER_NAME }}_test || true
-          docker run \
-            --detach \
-            --restart on-failure:3 \
-            --network=web \
-            --name ${{ env.UI_CONTAITER_NAME }}_test \
-            ${{ env.REGISTRY }}/profcomff/redirect-ui:test
-
-  build-production:
-    name: Build production
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    permissions:
-      contents: read
-      packages: write
+    env:
+      PROJECT_VERSION: dev-latest
+      PROJECT_NAME: com_profcomff_redirect_test
+      CONTAINER_SUFFIX: _test
+      DB_DSN: ${{ secrets.DB_DSN }}
+      JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+      OIDC_CLIENT_SECRET: ${{ secrets.OIDC_CLIENT_SECRET }}
+      OIDC_TRUSTED_TOKEN: ${{ secrets.OIDC_TRUSTED_TOKEN }}
+      BASE_URL: ${{ vars.BASE_URL }}
+      OIDC_CONFIGURATION_URI: ${{ vars.OIDC_CONFIGURATION_URI }}
+      OIDC_CLIENT_ID: ${{ vars.OIDC_CLIENT_ID }}
+      OIDC_ADMIN_CLAIM: ${{ vars.OIDC_ADMIN_CLAIM }}
+      OIDC_ADMIN_CLAIM_VALUE: ${{ vars.OIDC_ADMIN_CLAIM_VALUE }}
+      ALLOWED_DOMAINS: ${{ vars.ALLOWED_DOMAINS }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          repository: ${{ env.UI_IMAGE_NAME }}
-      - name: Log in to the Container registry
-        uses: docker/login-action@v2
+
+      - name: Log in to git.dyakov.space
+        uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: ${{ env.REGISTRY }}/profcomff/redirect-ui
-          tags: |
-            type=ref,event=tag,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            API_ROOT=https://to.profcomff.com
+          username: robot-profcomff
+          password: ${{ secrets.DYAKOVSPACE_CI_TOKEN }}
+
+      - name: Pull images
+        run: |
+          docker compose \
+            --project-directory deploy \
+            --project-name ${{ env.PROJECT_NAME }} \
+            pull
+
+      - name: Migrate DB
+        run: |
+          docker compose \
+            --project-directory deploy \
+            --project-name ${{ env.PROJECT_NAME }} \
+            run --rm control-panel-service \
+            uv run --active --no-sync --directory=backend/control-panel-service alembic upgrade head
+
+      - name: Deploy
+        run: |
+          docker compose \
+            --project-directory deploy \
+            --project-name ${{ env.PROJECT_NAME }} \
+            up --detach --remove-orphans
 
   deploy-production:
     name: Deploy Production
-    needs:
-      - build-production
-      - deploy-testing
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: [self-hosted, Linux, production]
     environment:
@@ -145,42 +74,49 @@ jobs:
       url: https://to.profcomff.com/
     permissions:
       packages: read
-
+    env:
+      PROJECT_VERSION: latest
+      PROJECT_NAME: com_profcomff_redirect
+      CONTAINER_SUFFIX: ""
+      DB_DSN: ${{ secrets.DB_DSN }}
+      JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+      OIDC_CLIENT_SECRET: ${{ secrets.OIDC_CLIENT_SECRET }}
+      OIDC_TRUSTED_TOKEN: ${{ secrets.OIDC_TRUSTED_TOKEN }}
+      BASE_URL: ${{ vars.BASE_URL }}
+      OIDC_CONFIGURATION_URI: ${{ vars.OIDC_CONFIGURATION_URI }}
+      OIDC_CLIENT_ID: ${{ vars.OIDC_CLIENT_ID }}
+      OIDC_ADMIN_CLAIM: ${{ vars.OIDC_ADMIN_CLAIM }}
+      OIDC_ADMIN_CLAIM_VALUE: ${{ vars.OIDC_ADMIN_CLAIM_VALUE }}
+      ALLOWED_DOMAINS: ${{ vars.ALLOWED_DOMAINS }}
     steps:
-      - name: Pull new API
-        run: docker pull ${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}:master
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Pull new UI
-        run: docker pull ${{ env.REGISTRY }}/profcomff/redirect-ui:latest
+      - name: Log in to git.dyakov.space
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: robot-profcomff
+          password: ${{ secrets.DYAKOVSPACE_CI_TOKEN }}
+
+      - name: Pull images
+        run: |
+          docker compose \
+            --project-directory deploy \
+            --project-name ${{ env.PROJECT_NAME }} \
+            pull
 
       - name: Migrate DB
         run: |
-          docker run \
-            --rm \
-            --network=web \
-            --env DB_DSN=${{ secrets.DB_DSN }} \
-            --name ${{ env.API_CONTAITER_NAME }}_migration \
-            ${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}:master \
-            alembic upgrade head
+          docker compose \
+            --project-directory deploy \
+            --project-name ${{ env.PROJECT_NAME }} \
+            run --rm control-panel-service \
+            uv run --active --no-sync --directory=backend/control-panel-service alembic upgrade head
 
-      - name: Run test API
+      - name: Deploy
         run: |
-          docker stop ${{ env.API_CONTAITER_NAME }} || true && docker rm ${{ env.API_CONTAITER_NAME }} || true
-          docker run \
-            --detach \
-            --restart always \
-            --network=web \
-            --env DB_DSN=${{ secrets.DB_DSN }} \
-            --env SECRET=${{ secrets.SECRET }} \
-            --name ${{ env.API_CONTAITER_NAME }} \
-            ${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}:master
-
-      - name: Run test UI
-        run: |
-          docker stop ${{ env.UI_CONTAITER_NAME }} || true && docker rm ${{ env.UI_CONTAITER_NAME }} || true
-          docker run \
-            --detach \
-            --restart always \
-            --network=web \
-            --name ${{ env.UI_CONTAITER_NAME }} \
-            ${{ env.REGISTRY }}/profcomff/redirect-ui:latest
+          docker compose \
+            --project-directory deploy \
+            --project-name ${{ env.PROJECT_NAME }} \
+            up --detach --remove-orphans

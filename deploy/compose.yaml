@@ -1,0 +1,36 @@
+services:
+  control-panel-service:
+    image: ${REGISTRY:-git.dyakov.space}/dyakov-space/to/control-panel-service:${PROJECT_VERSION:-latest}
+    container_name: com_profcomff_api_redirect${CONTAINER_SUFFIX:-}
+    restart: unless-stopped
+    networks:
+      web:
+        aliases:
+          - redirector-api
+    environment:
+      DB_DSN: ${DB_DSN}
+      BASE_URL: ${BASE_URL}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      OIDC_CONFIGURATION_URI: ${OIDC_CONFIGURATION_URI}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
+      OIDC_ADMIN_CLAIM: ${OIDC_ADMIN_CLAIM}
+      OIDC_ADMIN_CLAIM_VALUE: ${OIDC_ADMIN_CLAIM_VALUE}
+      OIDC_TRUSTED_TOKEN: ${OIDC_TRUSTED_TOKEN:-}
+      ALLOWED_DOMAINS: ${ALLOWED_DOMAINS}
+
+  web:
+    image: ${REGISTRY:-git.dyakov.space}/dyakov-space/to/web:${PROJECT_VERSION:-latest}
+    container_name: com_profcomff_ui_redirect${CONTAINER_SUFFIX:-}
+    restart: unless-stopped
+    networks:
+      web:
+        aliases:
+          - redirector-www
+    depends_on:
+      - control-panel-service
+
+networks:
+  web:
+    external: true
+    name: web
