@@ -1,11 +1,12 @@
 services:
   control-panel-service:
+    name: com_profcomff_api_redirect${CONTAINER_SUFFIX}
     image: ${REGISTRY:-git.dyakov.space}/dyakov-space/to/control-panel-service:${PROJECT_VERSION:-latest}
     restart: unless-stopped
     networks:
       web:
         aliases:
-          - redirector-api
+          - com_profcomff_api_redirect${CONTAINER_SUFFIX}
     environment:
       DB_DSN: ${DB_DSN}
       BASE_URL: ${BASE_URL}
@@ -18,12 +19,13 @@ services:
       ALLOWED_DOMAINS: ${ALLOWED_DOMAINS}
 
   web:
+    name: com_profcomff_ui_redirect${CONTAINER_SUFFIX}
     image: ${REGISTRY:-git.dyakov.space}/dyakov-space/to/web:${PROJECT_VERSION:-latest}
     restart: unless-stopped
     networks:
       web:
         aliases:
-          - redirector-www
+          - com_profcomff_ui_redirect${CONTAINER_SUFFIX}
     depends_on:
       - control-panel-service
 
