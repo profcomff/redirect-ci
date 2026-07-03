@@ -19,7 +19,7 @@ jobs:
     permissions:
       packages: read
     env:
-      PROJECT_VERSION: dev-latest
+      PROJECT_VERSION: latest
       PROJECT_NAME: com_profcomff_redirect_test
       CONTAINER_SUFFIX: _test
       DB_DSN: ${{ secrets.DB_DSN }}
