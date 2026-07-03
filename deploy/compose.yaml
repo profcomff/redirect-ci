@@ -1,6 +1,6 @@
 services:
   control-panel-service:
-    name: com_profcomff_api_redirect${CONTAINER_SUFFIX}
+    container_name: com_profcomff_api_redirect${CONTAINER_SUFFIX}
     image: ${REGISTRY:-git.dyakov.space}/dyakov-space/to/control-panel-service:${PROJECT_VERSION:-latest}
     restart: unless-stopped
     networks:
@@ -19,7 +19,7 @@ services:
       ALLOWED_DOMAINS: ${ALLOWED_DOMAINS}
 
   web:
-    name: com_profcomff_ui_redirect${CONTAINER_SUFFIX}
+    container_name: com_profcomff_ui_redirect${CONTAINER_SUFFIX}
     image: ${REGISTRY:-git.dyakov.space}/dyakov-space/to/web:${PROJECT_VERSION:-latest}
     restart: unless-stopped
     networks:
